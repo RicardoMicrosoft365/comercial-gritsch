@@ -3,6 +3,7 @@ import { FaChartBar, FaChartLine, FaChartPie, FaTable, FaFilter, FaFileInvoice, 
 import HorizontalBarChart from './HorizontalBarChart';
 import HeatMap from './HeatMap';
 import WeightRangeTable from './WeightRangeTable';
+import FileUploadAnalytics from './FileUploadAnalytics';
 
 interface DadosFreteRow {
   Data: string | Date;
@@ -37,6 +38,22 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
   // Novo estado para controlar a exibição de nomes de cidades no mapa
   const [showCityNames, setShowCityNames] = useState<boolean>(false);
   const [showWeightTotal, setShowWeightTotal] = useState<boolean>(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Funções para lidar com o resultado do upload
+  const handleUploadSuccess = (message: string) => {
+    setUploadMessage(message);
+    setUploadError(null);
+    
+    // Limpar a mensagem após 5 segundos
+    setTimeout(() => setUploadMessage(null), 5000);
+  };
+  
+  const handleUploadError = (error: string) => {
+    setUploadError(error);
+    setUploadMessage(null);
+  };
 
   // Função para formatar data - versão otimizada
   const formatDate = (dateString: string | Date): string => {
@@ -747,472 +764,488 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-      <div className="flex justify-between items-center p-4 bg-gray-700">
-        <h2 className="text-xl font-semibold flex items-center">
-          <FaChartBar className="mr-2 text-primary" /> 
-          Analytics
-        </h2>
+    <div className="text-white">
+      {/* Nova seção para upload de arquivos */}
+      <div className="mb-8 bg-gray-800 p-6 rounded-lg shadow-lg">
+        <FileUploadAnalytics 
+          onUploadSuccess={handleUploadSuccess}
+          onUploadError={handleUploadError}
+        />
         
-        <div className="flex items-center space-x-3">
-          {activeFilter && (
-            <div 
-              className="flex items-center bg-blue-800 px-3 py-1 rounded-lg text-sm cursor-pointer hover:bg-blue-700"
-              onClick={clearFilters}
-            >
-              <FaFilter className="mr-1 text-blue-300" />
-              <span>
-                Filtro: {activeFilter.type} = {activeFilter.value}
-              </span>
-              <span className="ml-2 text-blue-300">×</span>
-            </div>
-          )}
+        {uploadMessage && (
+          <div className="mt-4 bg-green-900 border border-green-700 rounded-lg p-4 text-white">
+            <p className="text-sm">{uploadMessage}</p>
+          </div>
+        )}
+      </div>
+      
+      <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+        <div className="flex justify-between items-center p-4 bg-gray-700">
+          <h2 className="text-xl font-semibold flex items-center">
+            <FaChartBar className="mr-2 text-primary" /> 
+            Analytics
+          </h2>
           
-          {hasFilter && filterInfo && (
-            <div className="flex items-center bg-blue-900 px-3 py-1 rounded-lg text-sm">
-              <FaCalendarAlt className="mr-1 text-blue-300" />
-              <span>
-                Período: {filterInfo.dataInicial} - {filterInfo.dataFinal}
-              </span>
-            </div>
-          )}
-          
-          <div className={`flex items-center px-3 py-1 rounded-lg text-sm ${filteredData.length === 0 ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-gray-200'}`}>
-            <span>
-              {filteredData.length} de {data.length} registros
-              {filteredData.length === 0 && activeFilter && (
-                <span className="ml-2 text-red-300">
-                  (Nenhum resultado para este filtro)
+          <div className="flex items-center space-x-3">
+            {activeFilter && (
+              <div 
+                className="flex items-center bg-blue-800 px-3 py-1 rounded-lg text-sm cursor-pointer hover:bg-blue-700"
+                onClick={clearFilters}
+              >
+                <FaFilter className="mr-1 text-blue-300" />
+                <span>
+                  Filtro: {activeFilter.type} = {activeFilter.value}
                 </span>
-              )}
-            </span>
+                <span className="ml-2 text-blue-300">×</span>
+              </div>
+            )}
+            
+            {hasFilter && filterInfo && (
+              <div className="flex items-center bg-blue-900 px-3 py-1 rounded-lg text-sm">
+                <FaCalendarAlt className="mr-1 text-blue-300" />
+                <span>
+                  Período: {filterInfo.dataInicial} - {filterInfo.dataFinal}
+                </span>
+              </div>
+            )}
+            
+            <div className={`flex items-center px-3 py-1 rounded-lg text-sm ${filteredData.length === 0 ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-gray-200'}`}>
+              <span>
+                {filteredData.length} de {data.length} registros
+                {filteredData.length === 0 && activeFilter && (
+                  <span className="ml-2 text-red-300">
+                    (Nenhum resultado para este filtro)
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="p-6">
-        {filteredData.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 bg-gray-700 rounded-lg p-6">
-            <p className="text-xl mb-4">Nenhum dado encontrado para análise</p>
-            
-            {activeFilter && (
-              <div className="mb-4">
-                <p className="font-semibold text-red-300">
-                  O filtro "{activeFilter.type} = {activeFilter.value}" não retornou resultados
-                  {hasFilter && filterInfo && ` no período ${filterInfo.dataInicial} - ${filterInfo.dataFinal}`}.
+        <div className="p-6">
+          {filteredData.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 bg-gray-700 rounded-lg p-6">
+              <p className="text-xl mb-4">Nenhum dado encontrado para análise</p>
+              
+              {activeFilter && (
+                <div className="mb-4">
+                  <p className="font-semibold text-red-300">
+                    O filtro "{activeFilter.type} = {activeFilter.value}" não retornou resultados
+                    {hasFilter && filterInfo && ` no período ${filterInfo.dataInicial} - ${filterInfo.dataFinal}`}.
+                  </p>
+                  <button 
+                    className="mt-4 bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+                    onClick={clearFilters}
+                  >
+                    Remover filtro
+                  </button>
+                </div>
+              )}
+              
+              {hasFilter && !activeFilter && (
+                <p className="mt-2 text-sm">
+                  Tente ajustar ou remover o filtro de data para visualizar os dados.
                 </p>
-                <button 
-                  className="mt-4 bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
-                  onClick={clearFilters}
-                >
-                  Remover filtro
-                </button>
-              </div>
-            )}
-            
-            {hasFilter && !activeFilter && (
-              <p className="mt-2 text-sm">
-                Tente ajustar ou remover o filtro de data para visualizar os dados.
-              </p>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Cards de Totais */}
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">
-                Indicadores Principais
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* Card 1: Notas Fiscais */}
-                <div className="bg-gradient-to-br from-blue-900 to-indigo-800 rounded-lg p-4 shadow-md border border-blue-700">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="text-sm font-semibold text-blue-200">Notas Fiscais</h3>
-                    <div className="bg-blue-800 p-1.5 rounded-lg">
-                      <FaFileInvoice className="text-lg text-blue-300" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-center my-2">
-                    <p className="text-3xl font-bold text-white text-center">{totais.totalNotas}</p>
-                  </div>
-                  
-                  {/* Linha divisória */}
-                  <div className="border-t border-blue-700 my-3 opacity-50"></div>
-                  
-                  {/* Médias */}
-                  <div className="mt-2 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="mr-1 text-blue-300" />
-                        <span className="text-blue-200">Média Dia Útil:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaDiaUtil)}
-                        <span className="text-blue-300 text-xs ml-1">({totais.diasUteis} dias)</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarCheck className="mr-1 text-blue-300" />
-                        <span className="text-blue-200">Média Dia Enviado:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaDiaEnvio)}
-                        <span className="text-blue-300 text-xs ml-1">({totais.diasComEnvio} dias)</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 2: Peso Total */}
-                <div className="bg-gradient-to-br from-green-900 to-emerald-800 rounded-lg p-4 shadow-md border border-green-700">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="text-sm font-semibold text-green-200">Peso Total (Kg)</h3>
-                    <div className="bg-green-800 p-1.5 rounded-lg">
-                      <FaBalanceScale className="text-lg text-green-300" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-center my-2">
-                    <p className="text-3xl font-bold text-white text-center">{formatarNumero(totais.totalPeso)}</p>
-                  </div>
-                  
-                  {/* Linha divisória */}
-                  <div className="border-t border-green-700 my-3 opacity-50"></div>
-                  
-                  {/* Médias */}
-                  <div className="mt-2 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="mr-1 text-green-300" />
-                        <span className="text-green-200">Média Dia Útil:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaPesoDiaUtil)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarCheck className="mr-1 text-green-300" />
-                        <span className="text-green-200">Média Dia Enviado:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaPesoDiaEnvio)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaFileInvoice className="mr-1 text-green-300" />
-                        <span className="text-green-200">Média por Envio:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaPesoPorEnvio)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 3: Volumes */}
-                <div className="bg-gradient-to-br from-amber-900 to-yellow-800 rounded-lg p-4 shadow-md border border-amber-700">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="text-sm font-semibold text-amber-200">Volumes</h3>
-                    <div className="bg-amber-800 p-1.5 rounded-lg">
-                      <FaBoxes className="text-lg text-amber-300" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-center my-2">
-                    <p className="text-3xl font-bold text-white text-center">{formatarNumero(totais.totalVolumes)}</p>
-                  </div>
-                  
-                  {/* Linha divisória */}
-                  <div className="border-t border-amber-700 my-3 opacity-50"></div>
-                  
-                  {/* Médias */}
-                  <div className="mt-2 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="mr-1 text-amber-300" />
-                        <span className="text-amber-200">Média Dia Útil:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaVolumesDiaUtil)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarCheck className="mr-1 text-amber-300" />
-                        <span className="text-amber-200">Média Dia Enviado:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaVolumesDiaEnvio)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaFileInvoice className="mr-1 text-amber-300" />
-                        <span className="text-amber-200">Média por Envio:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarNumero(totais.mediaVolumesPorEnvio)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 4: Valor das Notas */}
-                <div className="bg-gradient-to-br from-purple-900 to-violet-800 rounded-lg p-4 shadow-md border border-purple-700">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="text-sm font-semibold text-purple-200">Valor das Notas</h3>
-                    <div className="bg-purple-800 p-1.5 rounded-lg">
-                      <FaMoneyBillWave className="text-lg text-purple-300" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-center my-2">
-                    <p className="text-3xl font-bold text-white text-center">{formatarMoeda(totais.totalValorNotas)}</p>
-                  </div>
-                  
-                  {/* Linha divisória */}
-                  <div className="border-t border-purple-700 my-3 opacity-50"></div>
-                  
-                  {/* Médias */}
-                  <div className="mt-2 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="mr-1 text-purple-300" />
-                        <span className="text-purple-200">Média Dia Útil:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarMoeda(totais.mediaValorNotasDiaUtil)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarCheck className="mr-1 text-purple-300" />
-                        <span className="text-purple-200">Média Dia Enviado:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarMoeda(totais.mediaValorNotasDiaEnvio)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaFileInvoice className="mr-1 text-purple-300" />
-                        <span className="text-purple-200">Média por Envio:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarMoeda(totais.mediaValorNotasPorEnvio)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 5: Valor de Frete */}
-                <div className="bg-gradient-to-br from-red-900 to-rose-800 rounded-lg p-4 shadow-md border border-red-700">
-                  <div className="flex items-start justify-between mb-1">
-                    <h3 className="text-sm font-semibold text-red-200">Valor de Frete</h3>
-                    <div className="bg-red-800 p-1.5 rounded-lg">
-                      <FaTruck className="text-lg text-red-300" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-center my-2">
-                    <p className="text-3xl font-bold text-white text-center">{formatarMoeda(totais.totalFrete)}</p>
-                  </div>
-                  
-                  {/* Linha divisória */}
-                  <div className="border-t border-red-700 my-3 opacity-50"></div>
-                  
-                  {/* Médias */}
-                  <div className="mt-2 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="mr-1 text-red-300" />
-                        <span className="text-red-200">Média Dia Útil:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarMoeda(totais.mediaFreteDiaUtil)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaCalendarCheck className="mr-1 text-red-300" />
-                        <span className="text-red-200">Média Dia Enviado:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarMoeda(totais.mediaFreteDiaEnvio)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <FaFileInvoice className="mr-1 text-red-300" />
-                        <span className="text-red-200">Média por Envio:</span>
-                      </div>
-                      <span className="text-white font-semibold">
-                        {formatarMoeda(totais.mediaFretePorEnvio)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
+          ) : (
+            <>
+              {/* Cards de Totais */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">
+                  Indicadores Principais
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {/* Card 1: Notas Fiscais */}
+                  <div className="bg-gradient-to-br from-blue-900 to-indigo-800 rounded-lg p-4 shadow-md border border-blue-700">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-blue-200">Notas Fiscais</h3>
+                      <div className="bg-blue-800 p-1.5 rounded-lg">
+                        <FaFileInvoice className="text-lg text-blue-300" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center my-2">
+                      <p className="text-3xl font-bold text-white text-center">{totais.totalNotas}</p>
+                    </div>
+                    
+                    {/* Linha divisória */}
+                    <div className="border-t border-blue-700 my-3 opacity-50"></div>
+                    
+                    {/* Médias */}
+                    <div className="mt-2 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarAlt className="mr-1 text-blue-300" />
+                          <span className="text-blue-200">Média Dia Útil:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaDiaUtil)}
+                          <span className="text-blue-300 text-xs ml-1">({totais.diasUteis} dias)</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarCheck className="mr-1 text-blue-300" />
+                          <span className="text-blue-200">Média Dia Enviado:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaDiaEnvio)}
+                          <span className="text-blue-300 text-xs ml-1">({totais.diasComEnvio} dias)</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Gráficos de análise */}
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">
-                Análise de Distribuição
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Gráfico 1: Qtde de Notas por Filial */}
-                <HorizontalBarChart 
-                  data={dadosPorFilial} 
-                  title="Qtde de Notas por Filial"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="Filial" 
-                  barColor="#a11727"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleFilialClick}
-                  selectedBar={activeFilter?.type === 'Filial' ? activeFilter.value : undefined}
+                  {/* Card 2: Peso Total */}
+                  <div className="bg-gradient-to-br from-green-900 to-emerald-800 rounded-lg p-4 shadow-md border border-green-700">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-green-200">Peso Total (Kg)</h3>
+                      <div className="bg-green-800 p-1.5 rounded-lg">
+                        <FaBalanceScale className="text-lg text-green-300" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center my-2">
+                      <p className="text-3xl font-bold text-white text-center">{formatarNumero(totais.totalPeso)}</p>
+                    </div>
+                    
+                    {/* Linha divisória */}
+                    <div className="border-t border-green-700 my-3 opacity-50"></div>
+                    
+                    {/* Médias */}
+                    <div className="mt-2 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarAlt className="mr-1 text-green-300" />
+                          <span className="text-green-200">Média Dia Útil:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaPesoDiaUtil)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarCheck className="mr-1 text-green-300" />
+                          <span className="text-green-200">Média Dia Enviado:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaPesoDiaEnvio)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaFileInvoice className="mr-1 text-green-300" />
+                          <span className="text-green-200">Média por Envio:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaPesoPorEnvio)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Volumes */}
+                  <div className="bg-gradient-to-br from-amber-900 to-yellow-800 rounded-lg p-4 shadow-md border border-amber-700">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-amber-200">Volumes</h3>
+                      <div className="bg-amber-800 p-1.5 rounded-lg">
+                        <FaBoxes className="text-lg text-amber-300" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center my-2">
+                      <p className="text-3xl font-bold text-white text-center">{formatarNumero(totais.totalVolumes)}</p>
+                    </div>
+                    
+                    {/* Linha divisória */}
+                    <div className="border-t border-amber-700 my-3 opacity-50"></div>
+                    
+                    {/* Médias */}
+                    <div className="mt-2 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarAlt className="mr-1 text-amber-300" />
+                          <span className="text-amber-200">Média Dia Útil:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaVolumesDiaUtil)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarCheck className="mr-1 text-amber-300" />
+                          <span className="text-amber-200">Média Dia Enviado:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaVolumesDiaEnvio)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaFileInvoice className="mr-1 text-amber-300" />
+                          <span className="text-amber-200">Média por Envio:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarNumero(totais.mediaVolumesPorEnvio)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Valor das Notas */}
+                  <div className="bg-gradient-to-br from-purple-900 to-violet-800 rounded-lg p-4 shadow-md border border-purple-700">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-purple-200">Valor das Notas</h3>
+                      <div className="bg-purple-800 p-1.5 rounded-lg">
+                        <FaMoneyBillWave className="text-lg text-purple-300" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center my-2">
+                      <p className="text-3xl font-bold text-white text-center">{formatarMoeda(totais.totalValorNotas)}</p>
+                    </div>
+                    
+                    {/* Linha divisória */}
+                    <div className="border-t border-purple-700 my-3 opacity-50"></div>
+                    
+                    {/* Médias */}
+                    <div className="mt-2 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarAlt className="mr-1 text-purple-300" />
+                          <span className="text-purple-200">Média Dia Útil:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarMoeda(totais.mediaValorNotasDiaUtil)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarCheck className="mr-1 text-purple-300" />
+                          <span className="text-purple-200">Média Dia Enviado:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarMoeda(totais.mediaValorNotasDiaEnvio)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaFileInvoice className="mr-1 text-purple-300" />
+                          <span className="text-purple-200">Média por Envio:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarMoeda(totais.mediaValorNotasPorEnvio)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Valor de Frete */}
+                  <div className="bg-gradient-to-br from-red-900 to-rose-800 rounded-lg p-4 shadow-md border border-red-700">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-red-200">Valor de Frete</h3>
+                      <div className="bg-red-800 p-1.5 rounded-lg">
+                        <FaTruck className="text-lg text-red-300" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center my-2">
+                      <p className="text-3xl font-bold text-white text-center">{formatarMoeda(totais.totalFrete)}</p>
+                    </div>
+                    
+                    {/* Linha divisória */}
+                    <div className="border-t border-red-700 my-3 opacity-50"></div>
+                    
+                    {/* Médias */}
+                    <div className="mt-2 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarAlt className="mr-1 text-red-300" />
+                          <span className="text-red-200">Média Dia Útil:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarMoeda(totais.mediaFreteDiaUtil)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaCalendarCheck className="mr-1 text-red-300" />
+                          <span className="text-red-200">Média Dia Enviado:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarMoeda(totais.mediaFreteDiaEnvio)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FaFileInvoice className="mr-1 text-red-300" />
+                          <span className="text-red-200">Média por Envio:</span>
+                        </div>
+                        <span className="text-white font-semibold">
+                          {formatarMoeda(totais.mediaFretePorEnvio)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráficos de análise */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">
+                  Análise de Distribuição
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Gráfico 1: Qtde de Notas por Filial */}
+                  <HorizontalBarChart 
+                    data={dadosPorFilial} 
+                    title="Qtde de Notas por Filial"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="Filial" 
+                    barColor="#a11727"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleFilialClick}
+                    selectedBar={activeFilter?.type === 'Filial' ? activeFilter.value : undefined}
+                  />
+                  
+                  {/* Gráfico 2: Qtde de Notas por Roteiro */}
+                  <HorizontalBarChart 
+                    data={dadosPorRoteiro} 
+                    title="Qtde de Notas por Roteiro"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="Setor" 
+                    barColor="#a11727"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleRoteiroClick}
+                    selectedBar={activeFilter?.type === 'Roteiro' ? activeFilter.value : undefined}
+                  />
+                  
+                  {/* Gráfico 3: Qtde de Notas por UF */}
+                  <HorizontalBarChart 
+                    data={dadosPorUF} 
+                    title="Qtde de Notas por UF"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="UF" 
+                    barColor="#a11727"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleUFClick}
+                    selectedBar={activeFilter?.type === 'UF' ? activeFilter.value : undefined}
+                  />
+                  
+                  {/* Gráfico 4: Qtde de Notas por Cidade */}
+                  <HorizontalBarChart 
+                    data={dadosPorCidade} 
+                    title="Qtde de Notas por Cidade"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="Cidade" 
+                    barColor="#a11727"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleCidadeClick}
+                    selectedBar={activeFilter?.type === 'Cidade' ? activeFilter.value : undefined}
+                  />
+                </div>
+              </div>
+
+              {/* Mapa de Distribuição de Envios */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2 flex justify-between items-center">
+                  <span>Mapa de Distribuição de NFs por Cidade</span>
+                  <div className="flex items-center space-x-4">
+                    <label className="inline-flex items-center cursor-pointer text-sm">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={showCityNames}
+                        onChange={(e) => setShowCityNames(e.target.checked)}
+                      />
+                      <div className="relative w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      <span className="ml-2 text-sm font-medium text-gray-300">Mostrar nomes</span>
+                    </label>
+                    
+                    <label className="inline-flex items-center cursor-pointer text-sm">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={showWeightTotal}
+                        onChange={(e) => setShowWeightTotal(e.target.checked)}
+                      />
+                      <div className="relative w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      <span className="ml-2 text-sm font-medium text-gray-300">Mostrar peso</span>
+                    </label>
+                  </div>
+                </h3>
+                
+                <HeatMap 
+                  data={filteredData} 
+                  showCityNames={showCityNames}
+                  showWeightTotal={showWeightTotal}
+                  onMarkerClick={handleMapMarkerClick}
+                  selectedCity={activeFilter?.type === 'Cidade' ? activeFilter.value : undefined}
+                  appliedFilter={activeFilter ? `${activeFilter.type}: ${activeFilter.value}` : undefined}
                 />
                 
-                {/* Gráfico 2: Qtde de Notas por Roteiro */}
-                <HorizontalBarChart 
-                  data={dadosPorRoteiro} 
-                  title="Qtde de Notas por Roteiro"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="Setor" 
-                  barColor="#a11727"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleRoteiroClick}
-                  selectedBar={activeFilter?.type === 'Roteiro' ? activeFilter.value : undefined}
-                />
-                
-                {/* Gráfico 3: Qtde de Notas por UF */}
-                <HorizontalBarChart 
-                  data={dadosPorUF} 
-                  title="Qtde de Notas por UF"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="UF" 
-                  barColor="#a11727"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleUFClick}
-                  selectedBar={activeFilter?.type === 'UF' ? activeFilter.value : undefined}
-                />
-                
-                {/* Gráfico 4: Qtde de Notas por Cidade */}
-                <HorizontalBarChart 
-                  data={dadosPorCidade} 
-                  title="Qtde de Notas por Cidade"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="Cidade" 
-                  barColor="#a11727"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleCidadeClick}
-                  selectedBar={activeFilter?.type === 'Cidade' ? activeFilter.value : undefined}
+                {/* Tabela de Faixa de Peso */}
+                <WeightRangeTable 
+                  data={filteredData} 
+                  onWeightRangeClick={handleWeightRangeClick}
+                  selectedRange={activeFilter?.type === 'Faixa de Peso' ? activeFilter.value : undefined}
                 />
               </div>
-            </div>
-
-            {/* Mapa de Distribuição de Envios */}
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2 flex justify-between items-center">
-                <span>Mapa de Distribuição de NFs por Cidade</span>
-                <div className="flex items-center space-x-4">
-                  <label className="inline-flex items-center cursor-pointer text-sm">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={showCityNames}
-                      onChange={(e) => setShowCityNames(e.target.checked)}
-                    />
-                    <div className="relative w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    <span className="ml-2 text-sm font-medium text-gray-300">Mostrar nomes</span>
-                  </label>
-                  
-                  <label className="inline-flex items-center cursor-pointer text-sm">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only peer"
-                      checked={showWeightTotal}
-                      onChange={(e) => setShowWeightTotal(e.target.checked)}
-                    />
-                    <div className="relative w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    <span className="ml-2 text-sm font-medium text-gray-300">Mostrar peso</span>
-                  </label>
-                </div>
-              </h3>
               
-              <HeatMap 
-                data={filteredData} 
-                showCityNames={showCityNames}
-                showWeightTotal={showWeightTotal}
-                onMarkerClick={handleMapMarkerClick}
-                selectedCity={activeFilter?.type === 'Cidade' ? activeFilter.value : undefined}
-                appliedFilter={activeFilter ? `${activeFilter.type}: ${activeFilter.value}` : undefined}
-              />
-              
-              {/* Tabela de Faixa de Peso */}
-              <WeightRangeTable 
-                data={filteredData} 
-                onWeightRangeClick={handleWeightRangeClick}
-                selectedRange={activeFilter?.type === 'Faixa de Peso' ? activeFilter.value : undefined}
-              />
-            </div>
-            
-            {/* Gráficos de análise de origem */}
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">
-                Análise de Origem dos Envios
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Gráfico 1: Qtde de Notas por Base Origem */}
-                <HorizontalBarChart 
-                  data={dadosPorBaseOrigem} 
-                  title="Envios - Base Origem"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="Base Origem" 
-                  barColor="#b91c1c"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleBaseOrigemClick}
-                  selectedBar={activeFilter?.type === 'Base Origem' ? activeFilter.value : undefined}
-                />
-                
-                {/* Gráfico 2: Qtde de Notas por UF Origem */}
-                <HorizontalBarChart 
-                  data={dadosPorUFOrigem} 
-                  title="Envios - UF Origem"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="UF Origem" 
-                  barColor="#b91c1c"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleUFOrigemClick}
-                  selectedBar={activeFilter?.type === 'UF Origem' ? activeFilter.value : undefined}
-                />
-                
-                {/* Gráfico 3: Qtde de Notas por Cidade Origem */}
-                <HorizontalBarChart 
-                  data={dadosPorCidadeOrigem} 
-                  title="Envios - Cidade Origem"
-                  xAxisLabel="Quantidade de NFs"
-                  yAxisLabel="Cidade Origem" 
-                  barColor="#b91c1c"
-                  backgroundColor="#dbdad9"
-                  maxHeight={400}
-                  onBarClick={handleCidadeOrigemClick}
-                  selectedBar={activeFilter?.type === 'Cidade Origem' ? activeFilter.value : undefined}
-                />
+              {/* Gráficos de análise de origem */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2">
+                  Análise de Origem dos Envios
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Gráfico 1: Qtde de Notas por Base Origem */}
+                  <HorizontalBarChart 
+                    data={dadosPorBaseOrigem} 
+                    title="Envios - Base Origem"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="Base Origem" 
+                    barColor="#b91c1c"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleBaseOrigemClick}
+                    selectedBar={activeFilter?.type === 'Base Origem' ? activeFilter.value : undefined}
+                  />
+                  
+                  {/* Gráfico 2: Qtde de Notas por UF Origem */}
+                  <HorizontalBarChart 
+                    data={dadosPorUFOrigem} 
+                    title="Envios - UF Origem"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="UF Origem" 
+                    barColor="#b91c1c"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleUFOrigemClick}
+                    selectedBar={activeFilter?.type === 'UF Origem' ? activeFilter.value : undefined}
+                  />
+                  
+                  {/* Gráfico 3: Qtde de Notas por Cidade Origem */}
+                  <HorizontalBarChart 
+                    data={dadosPorCidadeOrigem} 
+                    title="Envios - Cidade Origem"
+                    xAxisLabel="Quantidade de NFs"
+                    yAxisLabel="Cidade Origem" 
+                    barColor="#b91c1c"
+                    backgroundColor="#dbdad9"
+                    maxHeight={400}
+                    onBarClick={handleCidadeOrigemClick}
+                    selectedBar={activeFilter?.type === 'Cidade Origem' ? activeFilter.value : undefined}
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

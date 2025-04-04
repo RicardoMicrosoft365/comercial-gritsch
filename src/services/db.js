@@ -1,9 +1,33 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+// Verificar se estamos no lado do servidor
+let sqlite3;
+let path;
+let fs;
+
+// Carregar módulos apenas se estivermos no lado do servidor (Node.js)
+if (typeof window === 'undefined') {
+  // Estamos no servidor
+  sqlite3 = require('sqlite3').verbose();
+  path = require('path');
+  fs = require('fs');
+} else {
+  console.warn('Tentativa de carregar módulos do servidor no cliente. Este módulo deve ser usado apenas no servidor.');
+}
 
 // Caminho para o banco de dados
-const DB_PATH = path.join(process.cwd(), 'database', 'transportes.db');
-console.log(`🗃️ Caminho do banco de dados: ${DB_PATH}`);
+let DB_PATH;
+let DB_DIR;
+
+// Inicializar caminhos apenas no servidor
+if (typeof window === 'undefined') {
+  DB_PATH = path.join(process.cwd(), 'database', 'transportes.db');
+  // Garantir que o diretório database existe
+  DB_DIR = path.join(process.cwd(), 'database');
+  if (!fs.existsSync(DB_DIR)) {
+    console.log(`🔨 Criando diretório do banco de dados: ${DB_DIR}`);
+    fs.mkdirSync(DB_DIR, { recursive: true });
+  }
+  console.log(`🗃️ Caminho do banco de dados: ${DB_PATH}`);
+}
 
 /**
  * Classe para gerenciar operações no banco de dados
@@ -11,24 +35,94 @@ console.log(`🗃️ Caminho do banco de dados: ${DB_PATH}`);
 class Database {
   constructor() {
     this.db = null;
+    this.isInitialized = false;
     console.log('🏗️ Instância do serviço de banco de dados criada');
+  }
+
+  /**
+   * Verifica se o ambiente é o servidor
+   * @private
+   */
+  _verificarAmbiente() {
+    if (typeof window !== 'undefined') {
+      throw new Error('Operações de banco de dados devem ser executadas apenas no servidor.');
+    }
+  }
+
+  /**
+   * Inicializa o banco de dados e cria a tabela se necessário
+   */
+  async initialize() {
+    this._verificarAmbiente();
+    
+    if (this.isInitialized) return;
+
+    try {
+      console.log('🔄 Iniciando banco de dados...');
+      await this.connect();
+
+      // Criar tabela se não existir
+      await new Promise((resolve, reject) => {
+        this.db.run(`
+          CREATE TABLE IF NOT EXISTS transportes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT,
+            cidade_origem TEXT,
+            uf_origem TEXT,
+            base_origem TEXT,
+            nf TEXT,
+            valor_da_nota REAL,
+            volumes INTEGER,
+            peso_real REAL,
+            peso_cubado REAL,
+            cidade_destino TEXT,
+            uf_destino TEXT,
+            base TEXT,
+            setor TEXT,
+            frete_peso REAL,
+            seguro REAL,
+            total_frete REAL
+          )
+        `, (err) => {
+          if (err) {
+            console.error('❌ Erro ao criar tabela:', err.message);
+            reject(err);
+          } else {
+            console.log('✅ Tabela verificada/criada com sucesso');
+            this.isInitialized = true;
+            resolve();
+          }
+        });
+      });
+    } catch (err) {
+      console.error('❌ Erro ao inicializar banco de dados:', err.message);
+      throw err;
+    }
   }
 
   /**
    * Conecta ao banco de dados
    */
   connect() {
+    this._verificarAmbiente();
+    
     return new Promise((resolve, reject) => {
       console.log('🔄 Tentando conectar ao banco de dados...');
-      this.db = new sqlite3.Database(DB_PATH, (err) => {
-        if (err) {
-          console.error('❌ Erro ao conectar ao banco de dados:', err.message);
-          reject(err);
-        } else {
-          console.log('✅ Conexão com o banco de dados estabelecida');
-          resolve(this.db);
-        }
-      });
+
+      try {
+        this.db = new sqlite3.Database(DB_PATH, (err) => {
+          if (err) {
+            console.error('❌ Erro ao conectar ao banco de dados:', err.message);
+            reject(err);
+          } else {
+            console.log('✅ Conexão com o banco de dados estabelecida');
+            resolve(this.db);
+          }
+        });
+      } catch (err) {
+        console.error('❌ Exceção ao conectar ao banco de dados:', err.message);
+        reject(err);
+      }
     });
   }
 
@@ -36,6 +130,8 @@ class Database {
    * Fecha a conexão com o banco de dados
    */
   close() {
+    this._verificarAmbiente();
+    
     return new Promise((resolve, reject) => {
       if (this.db) {
         console.log('🔄 Fechando conexão com o banco de dados...');
@@ -61,17 +157,15 @@ class Database {
    * @param {Object} data Dados do transporte
    * @returns {Promise<number>} ID do registro inserido
    */
-  insertTransporte(data) {
+  async insertTransporte(data) {
     return new Promise(async (resolve, reject) => {
       try {
-        console.log('🔄 Iniciando inserção de registro de transporte...');
-        
+        // Garantir que o banco de dados esteja conectado
         if (!this.db) {
-          console.log('ℹ️ Banco de dados não está conectado, conectando...');
           await this.connect();
         }
 
-        // Validar campos obrigatórios
+        // Validar campos obrigatórios básicos
         const camposObrigatorios = [
           'data',
           'cidade_origem',
@@ -80,15 +174,11 @@ class Database {
           'nf'
         ];
 
-        // Verificar se todos os campos obrigatórios estão presentes
-        const camposAusentes = camposObrigatorios.filter(campo => data[campo] === undefined);
+        // Verificação rápida de campos obrigatórios
+        const camposAusentes = camposObrigatorios.filter(campo => !data[campo]);
         if (camposAusentes.length > 0) {
-          const erro = `Campos obrigatórios não encontrados: ${camposAusentes.join(', ')}`;
-          console.error(`❌ ${erro}`);
-          throw new Error(erro);
+          throw new Error(`Campos obrigatórios não encontrados: ${camposAusentes.join(', ')}`);
         }
-
-        console.log('✅ Validação de campos obrigatórios concluída');
 
         const sql = `
           INSERT INTO transportes (
@@ -98,8 +188,8 @@ class Database {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
-        console.log('📝 SQL para inserção:', sql);
-        console.log('📊 Valores para inserção:', [
+        // Garantir valores padrão para campos não obrigatórios
+        const valores = [
           data.data || '',
           data.cidade_origem || '',
           data.uf_origem || '',
@@ -116,40 +206,16 @@ class Database {
           data.frete_peso || 0,
           data.seguro || 0,
           data.total_frete || 0
-        ]);
+        ];
 
-        this.db.run(sql, [
-          data.data || '',
-          data.cidade_origem || '',
-          data.uf_origem || '',
-          data.base_origem || '', 
-          data.nf || '',
-          data.valor_da_nota || 0,
-          data.volumes || 0,
-          data.peso_real || 0,
-          data.peso_cubado || 0,
-          data.cidade_destino || '',
-          data.uf_destino || '',
-          data.base || '',
-          data.setor || '',
-          data.frete_peso || 0,
-          data.seguro || 0,
-          data.total_frete || 0
-        ], function(err) {
+        this.db.run(sql, valores, function(err) {
           if (err) {
-            console.error('❌ Erro ao inserir transporte:', err.message);
-            if (err.message.includes('SQLITE_CONSTRAINT')) {
-              console.error('⚠️ Possível erro de restrição no banco de dados. Verifique valores duplicados ou campos obrigatórios.');
-            }
             reject(err);
           } else {
-            console.log(`✅ Registro inserido com sucesso! ID: ${this.lastID}`);
             resolve(this.lastID);
           }
         });
       } catch (err) {
-        console.error('❌ Erro durante o processo de inserção:', err.message);
-        console.error(err.stack);
         reject(err);
       }
     });
@@ -159,12 +225,18 @@ class Database {
    * Obtém todos os registros de transporte
    * @returns {Promise<Array>} Lista de transportes
    */
-  getAllTransportes() {
+  async getAllTransportes() {
+    this._verificarAmbiente();
+    
     return new Promise(async (resolve, reject) => {
       try {
         console.log('🔄 Buscando todos os registros de transporte...');
         
-        if (!this.db) {
+        // Garantir que o banco de dados esteja inicializado
+        if (!this.isInitialized) {
+          console.log('ℹ️ Banco de dados não está inicializado, inicializando...');
+          await this.initialize();
+        } else if (!this.db) {
           console.log('ℹ️ Banco de dados não está conectado, conectando...');
           await this.connect();
         }
@@ -190,12 +262,18 @@ class Database {
    * @param {Object} filters Filtros para busca
    * @returns {Promise<Array>} Lista de transportes filtrados
    */
-  searchTransportes(filters = {}) {
+  async searchTransportes(filters = {}) {
+    this._verificarAmbiente();
+    
     return new Promise(async (resolve, reject) => {
       try {
         console.log('🔄 Buscando transportes com filtros:', JSON.stringify(filters, null, 2));
         
-        if (!this.db) {
+        // Garantir que o banco de dados esteja inicializado
+        if (!this.isInitialized) {
+          console.log('ℹ️ Banco de dados não está inicializado, inicializando...');
+          await this.initialize();
+        } else if (!this.db) {
           console.log('ℹ️ Banco de dados não está conectado, conectando...');
           await this.connect();
         }
@@ -255,17 +333,19 @@ class Database {
           }
         });
       } catch (err) {
-        console.error('❌ Erro durante busca de transportes com filtros:', err.message);
+        console.error('❌ Erro durante busca filtrada de transportes:', err.message);
         reject(err);
       }
     });
   }
-  
+
   /**
-   * Executa uma consulta para verificar a estrutura do banco de dados
-   * Útil para depuração
+   * Verifica a estrutura do banco de dados
+   * @returns {Promise<Object>} Informações sobre o banco de dados
    */
   verificarEstrutura() {
+    this._verificarAmbiente();
+    
     return new Promise(async (resolve, reject) => {
       try {
         console.log('🔍 Verificando estrutura do banco de dados...');
@@ -315,8 +395,127 @@ class Database {
       }
     });
   }
+
+  /**
+   * Insere múltiplos registros de transporte em um único lote usando transações
+   * @param {Array<Object>} registros Array de registros a serem inseridos
+   * @returns {Promise<number>} Número de registros inseridos com sucesso
+   */
+  async insertTransportesEmLote(registros) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Garantir que o banco de dados esteja conectado
+        if (!this.db) {
+          await this.connect();
+        }
+
+        // Iniciar transação
+        await new Promise((resolve, reject) => {
+          this.db.run('BEGIN TRANSACTION', (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        const sql = `
+          INSERT INTO transportes (
+            data, cidade_origem, uf_origem, base_origem, nf, valor_da_nota, 
+            volumes, peso_real, peso_cubado, cidade_destino, uf_destino, 
+            base, setor, frete_peso, seguro, total_frete
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        // Preparar statement
+        const stmt = this.db.prepare(sql);
+        let inseridos = 0;
+
+        // Inserir cada registro
+        for (const data of registros) {
+          try {
+            // Verificação básica de campos obrigatórios
+            if (!data.data || !data.cidade_origem || !data.uf_origem || !data.base_origem || !data.nf) {
+              continue; // Pular registro inválido
+            }
+            
+            // Valores para inserção
+            const valores = [
+              data.data || '',
+              data.cidade_origem || '',
+              data.uf_origem || '',
+              data.base_origem || '', 
+              data.nf || '',
+              data.valor_da_nota || 0,
+              data.volumes || 0,
+              data.peso_real || 0,
+              data.peso_cubado || 0,
+              data.cidade_destino || '',
+              data.uf_destino || '',
+              data.base || '',
+              data.setor || '',
+              data.frete_peso || 0,
+              data.seguro || 0,
+              data.total_frete || 0
+            ];
+
+            // Executar statement preparado
+            await new Promise((resolve, reject) => {
+              stmt.run(valores, function(err) {
+                if (err) reject(err);
+                else {
+                  inseridos++;
+                  resolve();
+                }
+              });
+            });
+          } catch (err) {
+            // Continuar mesmo com erro em um registro específico
+            console.error(`Erro ao inserir registro no lote: ${err.message}`);
+          }
+        }
+
+        // Finalizar statement
+        await new Promise((resolve, reject) => {
+          stmt.finalize((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        // Commit da transação
+        await new Promise((resolve, reject) => {
+          this.db.run('COMMIT', (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        resolve(inseridos);
+      } catch (err) {
+        // Em caso de erro, fazer rollback
+        try {
+          await new Promise((resolve) => {
+            this.db.run('ROLLBACK', () => resolve());
+          });
+        } catch (rollbackErr) {
+          console.error('Erro ao fazer rollback:', rollbackErr);
+        }
+        
+        reject(err);
+      }
+    });
+  }
 }
 
-// Exporta uma instância do banco de dados
+// Instância única do banco de dados
 const database = new Database();
+
+// Inicializar o banco de dados logo quando o módulo é carregado
+(async () => {
+  try {
+    await database.initialize();
+  } catch (err) {
+    console.error('❌ Erro ao inicializar banco de dados:', err);
+  }
+})();
+
 module.exports = database; 
