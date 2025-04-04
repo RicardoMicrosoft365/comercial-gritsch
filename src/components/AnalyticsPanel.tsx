@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaChartBar, FaChartLine, FaChartPie, FaTable, FaFilter, FaFileInvoice, FaBalanceScale, FaBoxes, FaMoneyBillWave, FaTruck, FaCalendarAlt, FaCalendarCheck } from 'react-icons/fa';
 import HorizontalBarChart from './HorizontalBarChart';
 import HeatMap from './HeatMap';
+import WeightRangeTable from './WeightRangeTable';
 
 interface DadosFreteRow {
   Data: string | Date;
@@ -330,6 +331,32 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
       console.log(`Filtro aplicado: Cidade Origem = ${item.name}, resultando em ${filteredByCidadeOrigem.length} registros`);
     } else {
       console.log(`Aviso: Filtro Cidade Origem = ${item.name} não retornou resultados.`);
+    }
+  };
+
+  // Função para filtrar por faixa de peso quando clicado na tabela
+  const handleWeightRangeClick = (item: {label: string, min: number, max: number, count: number, percentage: number, accumulated: number}) => {
+    // Se já estamos filtrando por esta faixa de peso, remover o filtro
+    if (activeFilter && activeFilter.type === 'Faixa de Peso' && activeFilter.value === item.label) {
+      clearFilters();
+      return;
+    }
+    
+    // Atualizar o estado do filtro ativo
+    setActiveFilter({ type: 'Faixa de Peso', value: item.label });
+    
+    // Usar filteredData para manter a hierarquia de filtros
+    const filteredByWeightRange = filteredData.filter(row => {
+      const peso = typeof row.Peso === 'number' ? row.Peso : parseFloat(String(row.Peso));
+      return !isNaN(peso) && peso > item.min && peso <= item.max;
+    });
+    
+    // Atualizar os dados filtrados se houver resultados
+    if (filteredByWeightRange.length > 0) {
+      onFilterChange(filteredByWeightRange);
+      console.log(`Filtro aplicado: Faixa de Peso = ${item.label}, resultando em ${filteredByWeightRange.length} registros`);
+    } else {
+      console.log(`Aviso: Filtro Faixa de Peso = ${item.label} não retornou resultados.`);
     }
   };
 
@@ -1113,6 +1140,13 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
                 showCityNames={showCityNames}
                 onMarkerClick={handleMapMarkerClick}
                 selectedCity={activeFilter?.type === 'Cidade' ? activeFilter.value : undefined}
+              />
+              
+              {/* Tabela de Faixa de Peso */}
+              <WeightRangeTable 
+                data={filteredData} 
+                onWeightRangeClick={handleWeightRangeClick}
+                selectedRange={activeFilter?.type === 'Faixa de Peso' ? activeFilter.value : undefined}
               />
             </div>
             
