@@ -39,17 +39,23 @@ interface HeatMapProps {
     'Cidade Destino': string;
     'UF Destino': string;
     NF: string | number;
+    'Peso'?: number; // Adicionando propriedade opcional de peso
+    'Peso Real'?: number; // Adicionando propriedade opcional de peso real
   }>;
   showCityNames?: boolean; // Flag para mostrar nomes de cidades
+  showWeightTotal?: boolean; // Flag para mostrar o total em peso
   onMarkerClick?: (cidade: string) => void; // Callback para quando um marcador é clicado
   selectedCity?: string; // Cidade atualmente selecionada
+  appliedFilter?: string; // Filtro aplicado atualmente
 }
 
 const HeatMap: React.FC<HeatMapProps> = ({ 
   data, 
-  showCityNames = false, 
+  showCityNames = false,
+  showWeightTotal = false,
   onMarkerClick,
-  selectedCity 
+  selectedCity,
+  appliedFilter
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<any>(null);
@@ -131,9 +137,9 @@ const HeatMap: React.FC<HeatMapProps> = ({
       // Adicionar camada GeoJSON com estilo personalizado
       L.geoJSON(geoJsonData, {
         style: {
-          color: "#FFF", // Cor da borda
-          weight: 2, // Espessura da linha
-          opacity: 0.7, // Opacidade da linha
+          color: "#000000", // Cor da borda - alterado para preto
+          weight: 0.5, // Espessura da linha - aumentada para 3
+          opacity: 0.8, // Opacidade da linha
           fillColor: "transparent", // Transparente para não cobrir o mapa
           fillOpacity: 0,
         },
@@ -228,8 +234,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
         });
       }
       
-      // Agrupar NFs por cidade para contar os valores
-      const nfsPorCidade: { [key: string]: number } = {};
+      // Agrupar NFs por cidade para contar os valores e somar pesos
+      const nfsPorCidade: { [key: string]: { quantidade: number, pesoTotal: number } } = {};
       
       data.forEach(item => {
         if (!item['Cidade Destino'] || !item['UF Destino']) {
@@ -240,21 +246,36 @@ const HeatMap: React.FC<HeatMapProps> = ({
         const cidadeNormalizada = normalizarTexto(item['Cidade Destino']);
         const uf = item['UF Destino'];
         const chave = `${cidadeNormalizada}-${uf}`;
+        const peso = typeof item['Peso Real'] === 'number' ? item['Peso Real'] : 
+                   typeof item['Peso'] === 'number' ? item['Peso'] : 0;
         
-        // Incrementar contador de NFs (cada linha representa uma NF)
-        nfsPorCidade[chave] = (nfsPorCidade[chave] || 0) + 1;
+        // Inicializar se ainda não existir
+        if (!nfsPorCidade[chave]) {
+          nfsPorCidade[chave] = { quantidade: 0, pesoTotal: 0 };
+        }
+        
+        // Incrementar contador de NFs e somar o peso
+        nfsPorCidade[chave].quantidade += 1;
+        nfsPorCidade[chave].pesoTotal += peso;
       });
       
       console.log(`Agrupados ${Object.keys(nfsPorCidade).length} locais únicos de destino.`);
       console.log('Exemplos de destinos agrupados:', 
-        Object.entries(nfsPorCidade).slice(0, 3).map(([chave, quantidade]) => ({ chave, quantidade })));
+        Object.entries(nfsPorCidade).slice(0, 3).map(([chave, dados]) => ({ chave, dados })));
       
       // Marcadores para cada cidade
-      const marcadores: { cidade: string, uf: string, quantidade: number, latitude: number, longitude: number }[] = [];
+      const marcadores: { 
+        cidade: string, 
+        uf: string, 
+        quantidade: number,
+        pesoTotal: number,
+        latitude: number, 
+        longitude: number 
+      }[] = [];
       const cidadesSemCoordenadas: { cidade: string, uf: string }[] = [];
       
       // Converter dados agrupados para marcadores no mapa
-      Object.entries(nfsPorCidade).forEach(([chave, quantidade]) => {
+      Object.entries(nfsPorCidade).forEach(([chave, dados]) => {
         const [cidadeNormalizada, uf] = chave.split('-');
         
         // Buscar cidade no arquivo de municípios com verificação melhorada
@@ -304,7 +325,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
           marcadores.push({
             cidade: municipioEncontrado.nome,
             uf: UF_CODIGO_PARA_SIGLA[municipioEncontrado.codigo_uf],
-            quantidade,
+            quantidade: dados.quantidade,
+            pesoTotal: dados.pesoTotal,
             latitude,
             longitude
           });
@@ -354,15 +376,43 @@ const HeatMap: React.FC<HeatMapProps> = ({
           circle.addTo(leafletMap.current);
           markersGroup.addLayer(circle);
           
-          // Adicionar rótulo com a quantidade
+          // Manter tamanho mínimo dos marcadores quando zoom é muito próximo
+          leafletMap.current.on('zoomend', function() {
+            const currentZoom = leafletMap.current.getZoom();
+            if (currentZoom > 7) {
+              // Manter um tamanho mínimo quando o zoom está muito próximo
+              circle.setRadius(Math.max(10, raioAjustado));
+            } else {
+              // Usar o tamanho normal baseado na quantidade
+              circle.setRadius(Math.max(10, Math.min(50, raioAjustado)));
+            }
+          });
+          
+          // Adicionar rótulo com a quantidade ou peso conforme configuração
           const quantidadeText = Math.round(marcador.quantidade).toString();
-          const labelText = showCityNames 
-            ? `<div style="text-align: center; line-height: 1.2;">
-                <div style="font-size: 9px; white-space: nowrap; max-width: ${raioAjustado * 4}px; overflow: hidden; text-overflow: ellipsis;">${marcador.cidade}</div>
-                <div style="font-size: 12px; font-weight: bold;">${quantidadeText}</div>
-               </div>`
-            : quantidadeText;
-            
+          const pesoText = `${Math.round(marcador.pesoTotal).toLocaleString('pt-BR')} kg`;
+          
+          // Decide o que mostrar baseado nas flags e se é a cidade selecionada
+          let labelText;
+          
+          if (showCityNames) {
+            // Com nomes de cidades
+            labelText = `<div style="text-align: center; line-height: 1.2;">
+              <div style="font-size: 9px; white-space: nowrap; max-width: ${raioAjustado * 4}px; overflow: hidden; text-overflow: ellipsis;">${marcador.cidade}</div>
+              <div style="font-size: 12px; font-weight: bold;">${quantidadeText}</div>
+              ${showWeightTotal ? `<div style="font-size: 10px;">${pesoText}</div>` : ''}
+            </div>`;
+          } else if (showWeightTotal) {
+            // Sem nomes de cidades, mas com peso total
+            labelText = `<div style="text-align: center; line-height: 1.2;">
+              <div style="font-size: 12px; font-weight: bold;">${quantidadeText}</div>
+              <div style="font-size: 10px;">${pesoText}</div>
+            </div>`;
+          } else {
+            // Somente quantidade
+            labelText = quantidadeText;
+          }
+          
           const icon = L.divIcon({
             html: `<div style="background: transparent; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; color: ${marcador.cidade === selectedCity ? '#c92a2a' : '#9c0006'}; font-weight: bold; text-shadow: 0px 0px 2px white;">${labelText}</div>`,
             className: 'nf-marker-label',
@@ -382,7 +432,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
           circle.bindPopup(`
             <div>
               <strong>${marcador.cidade} - ${marcador.uf}</strong><br/>
-              Quantidade de NFs: ${marcador.quantidade.toLocaleString('pt-BR')}
+              Quantidade de NFs: ${marcador.quantidade.toLocaleString('pt-BR')}<br/>
+              Peso Total: ${marcador.pesoTotal.toLocaleString('pt-BR')} kg
             </div>
           `);
           
@@ -432,7 +483,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
     } catch (error) {
       console.error("Erro ao gerar marcadores no mapa:", error);
     }
-  }, [data, isClient, isLeafletLoaded, isJSONLoaded, showCityNames, onMarkerClick, selectedCity]);
+  }, [data, isClient, isLeafletLoaded, isJSONLoaded, showCityNames, showWeightTotal, onMarkerClick, selectedCity]);
 
   if (!isClient) {
     return (
@@ -464,13 +515,21 @@ const HeatMap: React.FC<HeatMapProps> = ({
                      {isLeafletLoaded ? 'Leaflet carregado' : 'Aguardando Leaflet'} | 
                      {isJSONLoaded ? 'JSON carregado' : 'Aguardando JSON'} |
                      {isGeoJSONLoaded ? 'GeoJSON carregado' : 'Aguardando GeoJSON'}</li>
-          <li>Estilo do mapa: Bolhas na cor <span style={{color: '#ffc7ce'}}>rosa</span> e quantidade de NFs em <span style={{color: '#9c0006'}}>vermelho escuro</span></li>
-          <li>Exibição de nomes: {showCityNames ? 'Ativada' : 'Desativada'}</li>
+          <li>Estilo do mapa: Bolhas na cor <span style={{color: '#ffc7ce'}}>rosa</span> e quantidade de NFs em <span style={{color: '#9c0006'}}>vermelho escuro</span>; Divisas dos estados em <span style={{color: '#000000'}}>preto</span></li>
+          <li>Exibição: 
+            {showCityNames ? <span className="ml-1 text-green-300">Nomes de cidades ativado</span> : <span className="ml-1 text-gray-400">Nomes de cidades desativado</span>} | 
+            {showWeightTotal ? <span className="ml-1 text-green-300">Total em peso ativado</span> : <span className="ml-1 text-gray-400">Total em peso desativado</span>}
+          </li>
           <li>Interatividade: {onMarkerClick ? 'Clique nas bolhas para filtrar por cidade' : 'Modo apenas visualização'}</li>
           {selectedCity && (
             <li>
               Cidade selecionada: <span className="font-bold text-red-300">{selectedCity}</span> 
               <span className="ml-2">(destacada em <span style={{color: '#ff6b6b'}}>vermelho mais intenso</span>)</span>
+            </li>
+          )}
+          {appliedFilter && (
+            <li>
+              Filtro aplicado: <span className="font-bold text-blue-300">{appliedFilter}</span>
             </li>
           )}
         </ul>

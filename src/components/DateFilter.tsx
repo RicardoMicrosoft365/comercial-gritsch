@@ -43,16 +43,14 @@ const DateFilter: React.FC<DateFilterProps> = ({ onFilterChange, startDate, endD
   // Estados para controlar os valores dos inputs
   const [startDateStr, setStartDateStr] = useState<string>(formatDateForInput(startDate));
   const [endDateStr, setEndDateStr] = useState<string>(formatDateForInput(endDate));
-  
-  // Refs para controlar o debounce
-  const startDateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const endDateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [pendingStartDate, setPendingStartDate] = useState<Date | null>(startDate);
+  const [pendingEndDate, setPendingEndDate] = useState<Date | null>(endDate);
   
   // Estado interno para mostrar o texto de filtro
   const [filterText, setFilterText] = useState<string>('Nenhum filtro de data aplicado');
   
-  // Função para aplicar o filtro com debounce
-  const debouncedApplyFilter = useCallback((newStartDate: Date | null, newEndDate: Date | null) => {
+  // Função para aplicar o filtro
+  const applyFilter = useCallback((newStartDate: Date | null, newEndDate: Date | null) => {
     // Atualizar o texto de filtro
     if (newStartDate && newEndDate) {
       setFilterText(`Filtrando dados de ${formatDateForDisplay(newStartDate)} a ${formatDateForDisplay(newEndDate)}`);
@@ -71,10 +69,12 @@ const DateFilter: React.FC<DateFilterProps> = ({ onFilterChange, startDate, endD
   // Atualizar os valores dos inputs quando as props mudam
   useEffect(() => {
     setStartDateStr(formatDateForInput(startDate));
+    setPendingStartDate(startDate);
   }, [startDate]);
 
   useEffect(() => {
     setEndDateStr(formatDateForInput(endDate));
+    setPendingEndDate(endDate);
   }, [endDate]);
   
   // Atualizar o texto de filtro quando as datas mudam
@@ -90,71 +90,38 @@ const DateFilter: React.FC<DateFilterProps> = ({ onFilterChange, startDate, endD
     }
   }, [startDate, endDate]);
 
-  // Handler para mudança da data inicial com debounce
+  // Handler para mudança da data inicial
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setStartDateStr(inputValue);
     
-    // Limpar timeout anterior se existir
-    if (startDateTimeoutRef.current) {
-      clearTimeout(startDateTimeoutRef.current);
-    }
-    
-    // Configurar novo timeout (300ms)
-    startDateTimeoutRef.current = setTimeout(() => {
-      // Converter para objeto Date adequado
-      const newStartDate = parseInputDate(inputValue);
-      
-      // Aplicar o filtro
-      debouncedApplyFilter(newStartDate, endDate);
-    }, 300);
-  }, [endDate, debouncedApplyFilter]);
+    // Converter para objeto Date adequado
+    const newStartDate = parseInputDate(inputValue);
+    setPendingStartDate(newStartDate);
+  }, []);
 
-  // Handler para mudança da data final com debounce
+  // Handler para mudança da data final
   const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     setEndDateStr(inputValue);
     
-    // Limpar timeout anterior se existir
-    if (endDateTimeoutRef.current) {
-      clearTimeout(endDateTimeoutRef.current);
-    }
-    
-    // Configurar novo timeout (300ms)
-    endDateTimeoutRef.current = setTimeout(() => {
-      // Converter para objeto Date adequado
-      const newEndDate = parseInputDate(inputValue);
-      
-      // Aplicar o filtro
-      debouncedApplyFilter(startDate, newEndDate);
-    }, 300);
-  }, [startDate, debouncedApplyFilter]);
-
-  // Limpar timeouts ao desmontar o componente
-  useEffect(() => {
-    return () => {
-      if (startDateTimeoutRef.current) {
-        clearTimeout(startDateTimeoutRef.current);
-      }
-      if (endDateTimeoutRef.current) {
-        clearTimeout(endDateTimeoutRef.current);
-      }
-    };
+    // Converter para objeto Date adequado
+    const newEndDate = parseInputDate(inputValue);
+    setPendingEndDate(newEndDate);
   }, []);
+
+  // Handler para confirmar o filtro
+  const handleConfirmFilter = useCallback(() => {
+    applyFilter(pendingStartDate, pendingEndDate);
+  }, [pendingStartDate, pendingEndDate, applyFilter]);
 
   // Handler para limpar os filtros
   const clearFilters = useCallback(() => {
     setStartDateStr('');
     setEndDateStr('');
+    setPendingStartDate(null);
+    setPendingEndDate(null);
     setFilterText('Nenhum filtro de data aplicado');
-    
-    // Limpar timeouts existentes
-    if (startDateTimeoutRef.current) {
-      clearTimeout(startDateTimeoutRef.current);
-    }
-    if (endDateTimeoutRef.current) {
-      clearTimeout(endDateTimeoutRef.current);
-    }
     
     // Aplicar o filtro imediatamente
     onFilterChange(null, null);
@@ -189,16 +156,24 @@ const DateFilter: React.FC<DateFilterProps> = ({ onFilterChange, startDate, endD
           />
         </div>
       </div>
-      <div className="mt-3 flex justify-between">
-        <div className="text-xs text-gray-400">
+      <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2">
+        <div className="text-xs text-gray-400 flex items-center">
           {filterText}
         </div>
-        <button
-          onClick={clearFilters}
-          className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md text-sm transition-colors"
-        >
-          Limpar Filtros
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleConfirmFilter}
+            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded-md text-sm transition-colors"
+          >
+            Confirmar
+          </button>
+          <button
+            onClick={clearFilters}
+            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md text-sm transition-colors"
+          >
+            Limpar Filtros
+          </button>
+        </div>
       </div>
     </div>
   );

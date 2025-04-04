@@ -36,6 +36,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
 }) => {
   // Novo estado para controlar a exibição de nomes de cidades no mapa
   const [showCityNames, setShowCityNames] = useState<boolean>(false);
+  const [showWeightTotal, setShowWeightTotal] = useState<boolean>(false);
 
   // Função para formatar data - versão otimizada
   const formatDate = (dateString: string | Date): string => {
@@ -1122,24 +1123,38 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
             <div className="mb-8">
               <h3 className="text-xl font-semibold mb-4 text-gray-200 border-b border-gray-700 pb-2 flex justify-between items-center">
                 <span>Mapa de Distribuição de NFs por Cidade</span>
-                <div className="flex items-center">
-                  <label className="inline-flex items-center cursor-pointer mr-2 text-sm">
+                <div className="flex items-center space-x-4">
+                  <label className="inline-flex items-center cursor-pointer text-sm">
                     <input 
                       type="checkbox" 
                       className="sr-only peer"
                       checked={showCityNames}
-                      onChange={() => setShowCityNames(!showCityNames)}
+                      onChange={(e) => setShowCityNames(e.target.checked)}
                     />
                     <div className="relative w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     <span className="ml-2 text-sm font-medium text-gray-300">Mostrar nomes</span>
                   </label>
+                  
+                  <label className="inline-flex items-center cursor-pointer text-sm">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={showWeightTotal}
+                      onChange={(e) => setShowWeightTotal(e.target.checked)}
+                    />
+                    <div className="relative w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <span className="ml-2 text-sm font-medium text-gray-300">Mostrar peso</span>
+                  </label>
                 </div>
               </h3>
+              
               <HeatMap 
                 data={filteredData} 
                 showCityNames={showCityNames}
+                showWeightTotal={showWeightTotal}
                 onMarkerClick={handleMapMarkerClick}
                 selectedCity={activeFilter?.type === 'Cidade' ? activeFilter.value : undefined}
+                appliedFilter={activeFilter ? `${activeFilter.type}: ${activeFilter.value}` : undefined}
               />
               
               {/* Tabela de Faixa de Peso */}
